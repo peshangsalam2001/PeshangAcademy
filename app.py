@@ -1,20 +1,19 @@
 from flask import Flask, request, send_file, render_template_string
 from pytube import YouTube
-import os
 import tempfile
-import subprocess
+import os
 
 app = Flask(__name__)
 
-# Simple homepage with form
+# Path to cookies.txt in your project root
+COOKIES_FILE_PATH = os.path.join(os.path.dirname(__file__), 'cookies.txt')
+
 HTML = """
 <!doctype html>
 <title>YouTube Downloader</title>
 <h2>Download YouTube Video</h2>
 <form method=post>
   YouTube URL: <input type=text name=url size=60 required><br><br>
-  Cookies (optional, paste your cookies.txt content):<br>
-  <textarea name=cookies rows=6 cols=60></textarea><br><br>
   <input type=submit value=Download>
 </form>
 """
@@ -22,33 +21,21 @@ HTML = """
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
-        url = request.form['url']
-        cookies_text = request.form.get('cookies', '').strip()
+        url = request.form['url'].strip()
 
         try:
-            # Save cookies to temp file if provided
-            cookies_file = None
-            if cookies_text:
-                cookies_file = tempfile.NamedTemporaryFile(delete=False, suffix='.txt')
-                cookies_file.write(cookies_text.encode('utf-8'))
-                cookies_file.close()
+            # Initialize YouTube object with cookies file
+            yt = YouTube(url, cookies=COOKIES_FILE_PATH if os.path.exists(COOKIES_FILE_PATH) else None)
 
-            # Initialize YouTube object with cookies if any
-            yt = YouTube(url, cookies=cookies_file.name if cookies_file else None)
-
-            # Select highest resolution progressive stream (audio+video)
+            # Select highest resolution progressive stream (video+audio)
             stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
 
             if not stream:
                 return "No suitable progressive stream found.", 400
 
-            # Download to temp file
+            # Download to temp directory
             temp_dir = tempfile.mkdtemp()
             video_path = stream.download(output_path=temp_dir)
-
-            # Clean up cookies file
-            if cookies_file:
-                os.unlink(cookies_file.name)
 
             # Send file to user
             return send_file(video_path, as_attachment=True, download_name=f"{yt.title}.mp4")
