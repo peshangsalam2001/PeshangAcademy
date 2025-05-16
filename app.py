@@ -5,7 +5,6 @@ import os
 
 app = Flask(__name__)
 
-# Path to cookies.txt in your project root
 COOKIES_FILE_PATH = os.path.join(os.path.dirname(__file__), 'cookies.txt')
 
 HTML = """
@@ -24,20 +23,16 @@ def index():
         url = request.form['url'].strip()
 
         try:
-            # Initialize YouTube object with cookies file
             yt = YouTube(url, cookies=COOKIES_FILE_PATH if os.path.exists(COOKIES_FILE_PATH) else None)
 
-            # Select highest resolution progressive stream (video+audio)
             stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
 
             if not stream:
                 return "No suitable progressive stream found.", 400
 
-            # Download to temp directory
             temp_dir = tempfile.mkdtemp()
             video_path = stream.download(output_path=temp_dir)
 
-            # Send file to user
             return send_file(video_path, as_attachment=True, download_name=f"{yt.title}.mp4")
 
         except Exception as e:
